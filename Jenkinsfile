@@ -5,6 +5,7 @@ pipeline {
   }
 
   stages {
+
     stage('CompileandRunSonarAnalysis') {
       steps {
         withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
@@ -20,7 +21,7 @@ pipeline {
 
     stage('Build') {
       steps {
-        withDockerRegistry([credentialsId: 'dockerlogin', url: 'https://index.docker.io/v1/']) {
+        withDockerRegistry([credentialsId: "dockerlogin", url: "https://index.docker.io/v1/"]) {
           script {
             app = docker.build("asecurityguru/testeb")
           }
@@ -49,7 +50,6 @@ pipeline {
       steps {
         withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
           bat '''
-            C:\\snyk\\snyk-win.exe auth %SNYK_TOKEN%
             mvn snyk:test -fn
           '''
         }
@@ -59,20 +59,19 @@ pipeline {
     stage('RunDASTUsingZAP') {
       steps {
         bat '''
-          C:\\Zap\\ZAP_2.16.1\\zap.bat ^
+          cd /d C:\\Zap\\ZAP_2.16.1
+          java -Xmx512m -jar zap-2.16.1.jar ^
             -port 9393 -cmd ^
             -quickurl https://www.example.com ^
             -quickprogress ^
-            -quickout C:\\Zap\\ZAP_2.16.1\\Output.html
+            -quickout Output.html
         '''
       }
     }
 
     stage('checkov') {
       steps {
-        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-          bat "checkov -s -f main.tf"
-        }
+        bat "checkov -s -f main.tf"
       }
     }
   }
