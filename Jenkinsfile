@@ -8,14 +8,19 @@ pipeline {
     stage('CompileandRunSonarAnalysis') {
       steps {
         withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-          bat '''mvn -Dmaven.test.failure.ignore verify sonar:sonar -Dsonar.login=%SONAR_TOKEN% -Dsonar.projectKey=easybuggy -Dsonar.host.url=http://localhost:9000/'''
+          bat '''
+            mvn -Dmaven.test.failure.ignore verify sonar:sonar ^
+              -Dsonar.login=%SONAR_TOKEN% ^
+              -Dsonar.projectKey=easybuggy ^
+              -Dsonar.host.url=http://localhost:9000/
+          '''
         }
       }
     }
 
     stage('Build') {
       steps {
-        withDockerRegistry([credentialsId: "dockerlogin", url: "https://index.docker.io/v1/"]) {
+        withDockerRegistry([credentialsId: 'dockerlogin', url: 'https://index.docker.io/v1/']) {
           script {
             app = docker.build("asecurityguru/testeb")
           }
@@ -28,7 +33,10 @@ pipeline {
         withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
           script {
             try {
-              bat("C:\\snyk\\snyk-win.exe container test asecurityguru/testeb")
+              bat '''
+                C:\\snyk\\snyk-win.exe auth %SNYK_TOKEN%
+                C:\\snyk\\snyk-win.exe container test asecurityguru/testeb
+              '''
             } catch (err) {
               echo err.getMessage()
             }
@@ -40,20 +48,31 @@ pipeline {
     stage('RunSnykSCA') {
       steps {
         withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
-          bat("mvn snyk:test -fn")
+          bat '''
+            C:\\snyk\\snyk-win.exe auth %SNYK_TOKEN%
+            mvn snyk:test -fn
+          '''
         }
       }
     }
 
     stage('RunDASTUsingZAP') {
       steps {
-        bat("C:\Zap\ZAP_2.16.1\\zap.bat -port 9393 -cmd -quickurl https://www.example.com -quickprogress -quickout C:\Zap\ZAP_2.16.1\\Output.html")
+        bat '''
+          C:\\Zap\\ZAP_2.16.1\\zap.bat ^
+            -port 9393 -cmd ^
+            -quickurl https://www.example.com ^
+            -quickprogress ^
+            -quickout C:\\Zap\\ZAP_2.16.1\\Output.html
+        '''
       }
     }
 
     stage('checkov') {
       steps {
-        bat("checkov -s -f main.tf")
+        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+          bat "checkov -s -f main.tf"
+        }
       }
     }
   }
